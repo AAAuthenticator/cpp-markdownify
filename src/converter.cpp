@@ -464,9 +464,65 @@ std::string MarkdownConverter::convert_pre(tinyxml2::XMLElement* el, const std::
     return "\n\n```" + lang + "\n" + processed_text + "\n```\n\n";
 }
 
+std::string MarkdownConverter::element_to_html(tinyxml2::XMLElement* element) {
+    if (!element) return "";
+
+    tinyxml2::XMLPrinter printer;
+    element->Accept(&printer);
+    return std::string(printer.CStr());
+}
+
 std::string MarkdownConverter::convert_table(tinyxml2::XMLElement* el, const std::string& text,
                                             const std::unordered_set<std::string>& parent_tags) {
-    return "\n\n" + text + "\n";
+    if (options_.preserve_html_tables) {
+        return "\n\n" + element_to_html(el) + "\n\n";
+    }
+
+    // Count columns in the first row for GFM table separator
+    int column_count = 0;
+    tinyxml2::XMLElement* first_row = nullptr;
+
+    // Try to find first row in thead, then tbody, then directly in table
+    auto thead = el->FirstChildElement("thead");
+    if (thead) {
+        first_row = thead->FirstChildElement("tr");
+    }
+    if (!first_row) {
+        auto tbody = el->FirstChildElement("tbody");
+        if (tbody) {
+            first_row = tbody->FirstChildElement("tr");
+        }
+    }
+    if (!first_row) {
+        first_row = el->FirstChildElement("tr");
+    }
+
+    // Count columns (th or td elements in first row)
+    if (first_row) {
+        for (auto cell = first_row->FirstChildElement(); cell; cell = cell->NextSiblingElement()) {
+            std::string tag_name = get_tag_name(cell);
+            std::transform(tag_name.begin(), tag_name.end(), tag_name.begin(), ::tolower);
+            if (tag_name == "th" || tag_name == "td") {
+                column_count++;
+            }
+        }
+    }
+
+    // Insert separator row after first line for GFM compatibility
+    std::string result = text;
+    if (column_count > 0) {
+        size_t first_newline = result.find('\n');
+        if (first_newline != std::string::npos) {
+            std::string separator = "|";
+            for (int i = 0; i < column_count; i++) {
+                separator += " --- |";
+            }
+            separator += "\n";
+            result.insert(first_newline + 1, separator);
+        }
+    }
+
+    return "\n\n" + result + "\n";
 }
 
 std::string MarkdownConverter::convert_tr(tinyxml2::XMLElement* el, const std::string& text,
