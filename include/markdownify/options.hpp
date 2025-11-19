@@ -49,7 +49,7 @@ struct Options {
     bool escape_underscores = true;
     bool escape_misc = false;
 
-    HeadingStyle heading_style = HeadingStyle::UNDERLINED;
+    HeadingStyle heading_style = HeadingStyle::ATX;
 
     std::vector<std::string> keep_inline_images_in;
 
